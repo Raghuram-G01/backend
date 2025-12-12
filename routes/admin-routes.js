@@ -1,9 +1,5 @@
 const express = require("express");
-const {
-  getAllRequests,
-  adminSignup,
-} = require("../api-function/admin-function");
+const { getAllRequests } = require("../api-function/admin-function");
 const router = express.Router();
-router.get("/getRequests/:id", getAllRequests);
-router.post("/adminSignup", adminSignup);
+router.get("/getAllRequests/:id", getAllRequests);
 module.exports = router;

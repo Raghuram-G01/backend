@@ -24,5 +24,11 @@ const Admin = new mongoose.Schema({
     type: String,
     require: true,
   },
+  listOfRequest: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  ],
 });
 module.exports = mongoose.model("Admin", Admin);

@@ -8,9 +8,9 @@ const AssignmentCreated=new mongooss.Schema({
     type:String,
     require:true,
   },
-    users :{
+    assignmentCompleted :{
     type:mongooss.Schema.Types.ObjectId,
-    ref:"User",
+    ref:"AssignmentCompleted",
     require:true,
   },
 });

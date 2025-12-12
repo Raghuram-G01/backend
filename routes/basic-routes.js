@@ -1,5 +1,5 @@
 const express = require("express");
-const { createUser } = require("../api-function/user-function");
+const { createUser, adminSignup } = require("../api-function/user-function");
 // const {
 //   createUser,
 //   createManyUsers,
@@ -12,5 +12,5 @@ const { createUser } = require("../api-function/user-function");
 // } = require("../apis-function/user-functions");
 const router = express.Router();
 router.post("/userSignup", createUser);
-
+router.post("/adminSignup", adminSignup);
 module.exports = router;

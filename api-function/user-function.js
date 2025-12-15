@@ -108,13 +108,13 @@ exports.getUserDetails = async (req, res) => {
 
 exports.fetchAssignments = async (req, res) => {
   try {
-    const { userId } = req.query;
+    const { userId } = req.body;
     const getAssignments = await User.findById(userId).populate(
       "setOfAssignmentsAssigned"
     );
     return res.status(200).json({
       success: true,
-      assignmentList: getAssignments.setOfAssignmentsAssigned,
+      assignmentList: getAssignments?.setOfAssignmentsAssigned || [],
     });
   } catch (e) {
     res.status(404).json({
@@ -182,7 +182,6 @@ exports.submitTest = async (req, res) => {
       user: userId,
       assignment: assignmentId,
       submittedAt: new Date(),
-      pdfFile: pdfFile || null,
       marks: null,
       feedback: null
     });

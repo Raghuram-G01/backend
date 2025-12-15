@@ -2,20 +2,19 @@ const Admin = require("../models/admin");
 const User = require("../models/user");
 const assignmentCompleted = require("../models/assignment-completed");
 const assignmentCreated = require("../models/assignment-created");
+const AssignmentCompleted = assignmentCompleted;
+const AssignmentCreated = assignmentCreated;
 exports.createUser = async (req, res) => {
   try {
     const {
       firstName,
-      secondName,
       email,
-      mobileNumber,
       collegeName,
-      active,
       password,
     } = req.body;
     const [checkDetails, checkAdminDetails] = await Promise.all([
-      User.findOne({ mobileNumber, email }),
-      Admin.findOne({ mobileNumber, email }),
+      User.findOne({ email }),
+      Admin.findOne({ email }),
     ]);
     if (checkDetails || checkAdminDetails) {
       return res.status(400).json({
@@ -25,9 +24,7 @@ exports.createUser = async (req, res) => {
     }
     const userDetails = await User.create({
       firstName,
-      secondName,
       email,
-      mobileNumber,
       collegeName,
       active: false,
       password,
@@ -52,9 +49,7 @@ exports.adminSignup = async (req, res) => {
   try {
     const {
       firstName,
-      secondName,
       email,
-      mobileNumber,
       collegeName,
       password,
     } = req.body;
@@ -66,8 +61,8 @@ exports.adminSignup = async (req, res) => {
       });
     }
     const [checkDetails, checkUserDetails] = await Promise.all([
-      Admin.findOne({ mobileNumber, email }),
-      User.findOne({ mobileNumber, email }),
+      Admin.findOne({ email }),
+      User.findOne({ email }),
     ]);
     if (checkDetails || checkUserDetails) {
       return res.status(400).json({
@@ -77,9 +72,7 @@ exports.adminSignup = async (req, res) => {
     }
     const createAdmin = await Admin.create({
       firstName,
-      secondName,
       email,
-      mobileNumber,
       collegeName,
       password,
     });
@@ -98,7 +91,6 @@ exports.adminSignup = async (req, res) => {
 exports.getUserDetails = async (req, res) => {
   try {
     const { id } = req.params;
-    // console.log("hi");
     console.log("Requested ID:", id);
     const getDetails = await User.findById(id);
 
@@ -162,7 +154,7 @@ exports.completeAssignment = async (req, res) => {
 
 exports.submitTest = async (req, res) => {
   try {
-    const { userId, assignmentId } = req.body;
+    const { userId, assignmentId, pdfFile } = req.body;
     const assignmentDetails = await AssignmentCreated.findById(assignmentId);
     if (!assignmentDetails) {
       return res.status(404).json({
@@ -190,6 +182,9 @@ exports.submitTest = async (req, res) => {
       user: userId,
       assignment: assignmentId,
       submittedAt: new Date(),
+      pdfFile: pdfFile || null,
+      marks: null,
+      feedback: null
     });
     await assignmentCreated.findByIdAndUpdate(
       assignmentId,
@@ -198,7 +193,7 @@ exports.submitTest = async (req, res) => {
     );
     return res.status(200).json({
       success: true,
-      message: "Test submitted successfully",
+      message: "Assignment submitted successfully",
     });
   } catch (e) {
     return res.status(500).json({
@@ -207,4 +202,90 @@ exports.submitTest = async (req, res) => {
     });
   }
 };
-  
+
+// User Login
+exports.userLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    const user = await User.findOne({ email });
+    
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+    
+    if (user.password !== password) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid credentials"
+      });
+    }
+    
+    if (!user.active) {
+      return res.status(403).json({
+        success: false,
+        message: "Account not activated. Please request admin approval."
+      });
+    }
+    
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      data: {
+        id: user._id,
+        firstName: user.firstName,
+        email: user.email,
+        collegeName: user.collegeName,
+        role: 'user'
+      }
+    });
+  } catch (e) {
+    return res.status(500).json({
+      success: false,
+      error: e.message
+    });
+  }
+};
+
+// Admin Login
+exports.adminLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    const admin = await Admin.findOne({ email });
+    
+    if (!admin) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin not found"
+      });
+    }
+    
+    if (admin.password !== password) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid credentials"
+      });
+    }
+    
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      data: {
+        id: admin._id,
+        firstName: admin.firstName,
+        email: admin.email,
+        collegeName: admin.collegeName,
+        role: 'admin'
+      }
+    });
+  } catch (e) {
+    return res.status(500).json({
+      success: false,
+      error: e.message
+    });
+  }
+};

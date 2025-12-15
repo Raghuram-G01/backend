@@ -7,6 +7,7 @@ const {
   fetchResult,
   handleUserRequest,
   gradeSubmission,
+  getAdminAssignments,
 } = require("../api-function/admin-function");
 const router = express.Router();
 router.get("/getAllRequests/:id", getAllRequests);
@@ -16,4 +17,5 @@ router.put("/deactivateUser", deactivateUser);
 router.post("/fetchResult", fetchResult);
 router.post("/handleUserRequest", handleUserRequest);
 router.post("/gradeSubmission", gradeSubmission);
+router.get("/getAssignments/:adminId", getAdminAssignments);
 module.exports = router;

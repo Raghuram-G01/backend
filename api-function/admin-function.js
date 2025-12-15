@@ -167,6 +167,32 @@ exports.fetchResult = async (req, res) => {
   }
 };
 
+// Get admin's assignments
+exports.getAdminAssignments = async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    
+    const adminData = await admin.findById(adminId).populate('listOfAssignments');
+    
+    if (!adminData) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: adminData.listOfAssignments,
+    });
+  } catch (e) {
+    return res.status(500).json({
+      success: false,
+      error: e.message,
+    });
+  }
+};
+
 // Handle user requests (approve/reject)
 exports.handleUserRequest = async (req, res) => {
   try {

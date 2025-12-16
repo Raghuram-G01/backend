@@ -2,106 +2,180 @@ const Admin = require("../models/admin");
 const User = require("../models/user");
 const assignmentCompleted = require("../models/assignment-completed");
 const assignmentCreated = require("../models/assignment-created");
-const AssignmentCompleted = assignmentCompleted;
-const AssignmentCreated = assignmentCreated;
+
 exports.createUser = async (req, res) => {
   try {
-    const {
-      firstName,
-      email,
-      collegeName,
-      password,
-    } = req.body;
-    const [checkDetails, checkAdminDetails] = await Promise.all([
-      User.findOne({ email }),
-      Admin.findOne({ email }),
-    ]);
-    if (checkDetails || checkAdminDetails) {
+    const { firstName, email, collegeName, password } = req.body;
+    
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
       return res.status(400).json({
         success: false,
         message: "User already exists",
       });
     }
+
     const userDetails = await User.create({
       firstName,
       email,
       collegeName,
-      active: false,
       password,
+      status: 'PENDING'
     });
 
     await Admin.findOneAndUpdate(
       { collegeName: collegeName },
       { $push: { listOfRequest: userDetails._id } }
     );
+
     return res.status(200).json({
       success: true,
-      message: "User is created successfully",
+      message: "Registration successful. Waiting for admin approval.",
     });
   } catch (e) {
-    res.status(404).json({
+    res.status(500).json({
       success: false,
-      error: e,
+      error: e.message,
     });
   }
 };
+
 exports.adminSignup = async (req, res) => {
   try {
-    const {
-      firstName,
-      email,
-      collegeName,
-      password,
-    } = req.body;
+    const { firstName, email, collegeName, password } = req.body;
+    
     const checkCollege = await Admin.findOne({ collegeName });
     if (checkCollege) {
       return res.status(400).json({
         success: false,
-        message: "Admin already exists",
+        message: "Admin already exists for this college",
       });
     }
-    const [checkDetails, checkUserDetails] = await Promise.all([
-      Admin.findOne({ email }),
-      User.findOne({ email }),
-    ]);
-    if (checkDetails || checkUserDetails) {
+
+    const existingAdmin = await Admin.findOne({ email });
+    if (existingAdmin) {
       return res.status(400).json({
         success: false,
         message: "Admin already exists",
       });
     }
-    const createAdmin = await Admin.create({
+
+    await Admin.create({
       firstName,
       email,
       collegeName,
       password,
     });
+
     return res.status(200).json({
       success: true,
-      message: "Admin is created",
+      message: "Admin created successfully",
     });
   } catch (e) {
-    res.status(404).json({
+    res.status(500).json({
       success: false,
-      error: e,
+      error: e.message,
     });
   }
 };
 
-exports.getUserDetails = async (req, res) => {
+exports.userLogin = async (req, res) => {
   try {
-    const { id } = req.params;
-    console.log("Requested ID:", id);
-    const getDetails = await User.findById(id);
-
+    const { email, password } = req.body;
+    
+    const user = await User.findOne({ email });
+    
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+    
+    if (user.password !== password) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid credentials"
+      });
+    }
+    
+    if (user.status !== 'APPROVED') {
+      return res.status(403).json({
+        success: false,
+        message: "Waiting for admin acceptance"
+      });
+    }
+    
+    const { generateToken } = require('../middleware/auth');
+    const token = generateToken({
+      id: user._id,
+      email: user.email,
+      role: 'user'
+    });
+    
     return res.status(200).json({
       success: true,
-      data: getDetails,
+      message: "Login successful",
+      data: {
+        id: user._id,
+        firstName: user.firstName,
+        email: user.email,
+        collegeName: user.collegeName,
+        role: 'user',
+        token
+      }
     });
   } catch (e) {
-    return res.status(404).json({
+    return res.status(500).json({
       success: false,
-      error: e,
+      error: e.message
+    });
+  }
+};
+
+exports.adminLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    const admin = await Admin.findOne({ email });
+    
+    if (!admin) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin not found"
+      });
+    }
+    
+    if (admin.password !== password) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid credentials"
+      });
+    }
+    
+    const { generateToken } = require('../middleware/auth');
+    const token = generateToken({
+      id: admin._id,
+      email: admin.email,
+      role: 'admin'
+    });
+    
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      data: {
+        id: admin._id,
+        firstName: admin.firstName,
+        email: admin.email,
+        collegeName: admin.collegeName,
+        role: 'admin',
+        token
+      }
+    });
+  } catch (e) {
+    return res.status(500).json({
+      success: false,
+      error: e.message
     });
   }
 };
@@ -124,38 +198,10 @@ exports.fetchAssignments = async (req, res) => {
   }
 };
 
-exports.completeAssignment = async (req, res) => {
-  try {
-    const { userId, assignmentId } = req.body;
-    await AssignmentCompleted.create({
-      user: userId,
-      assignment: assignmentId,
-      completedTime: new Date(),
-    });
-
-    await User.findByIdAndUpdate(
-      userId,
-      {
-        $pull: { setOfAssignmentsAssigned: assignmentId },
-      },
-      { new: true }
-    );
-    return res.status(200).json({
-      success: true,
-      message: "Assignment marked as completed",
-    });
-  } catch (e) {
-    res.status(404).json({
-      success: false,
-      error: e,
-    });
-  }
-};
-
 exports.submitTest = async (req, res) => {
   try {
-    const { userId, assignmentId, pdfFile } = req.body;
-    const assignmentDetails = await AssignmentCreated.findById(assignmentId);
+    const { userId, assignmentId } = req.body;
+    const assignmentDetails = await assignmentCreated.findById(assignmentId);
     if (!assignmentDetails) {
       return res.status(404).json({
         success: false,
@@ -198,93 +244,6 @@ exports.submitTest = async (req, res) => {
     return res.status(500).json({
       success: false,
       error: e.message,
-    });
-  }
-};
-
-// User Login
-exports.userLogin = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    const user = await User.findOne({ email });
-    
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: "User not found"
-      });
-    }
-    
-    if (user.password !== password) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid credentials"
-      });
-    }
-    
-    if (!user.active) {
-      return res.status(403).json({
-        success: false,
-        message: "Account not activated. Please request admin approval."
-      });
-    }
-    
-    return res.status(200).json({
-      success: true,
-      message: "Login successful",
-      data: {
-        id: user._id,
-        firstName: user.firstName,
-        email: user.email,
-        collegeName: user.collegeName,
-        role: 'user'
-      }
-    });
-  } catch (e) {
-    return res.status(500).json({
-      success: false,
-      error: e.message
-    });
-  }
-};
-
-// Admin Login
-exports.adminLogin = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    const admin = await Admin.findOne({ email });
-    
-    if (!admin) {
-      return res.status(400).json({
-        success: false,
-        message: "Admin not found"
-      });
-    }
-    
-    if (admin.password !== password) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid credentials"
-      });
-    }
-    
-    return res.status(200).json({
-      success: true,
-      message: "Login successful",
-      data: {
-        id: admin._id,
-        firstName: admin.firstName,
-        email: admin.email,
-        collegeName: admin.collegeName,
-        role: 'admin'
-      }
-    });
-  } catch (e) {
-    return res.status(500).json({
-      success: false,
-      error: e.message
     });
   }
 };

@@ -2,31 +2,25 @@ const mongoose = require("mongoose");
 const User = new mongoose.Schema({
   firstName: {
     type: String,
-    require: true,
-  },
-  secondName: {
-    type: String,
-    require: true,
+    required: true,
   },
   email: {
     type: String,
-    require: true,
-  },
-  mobileNumber: {
-    type: String,
-    require: true,
+    required: true,
+    unique: true,
   },
   collegeName: {
     type: String,
-    require: true,
-  },
-  active: {
-    type: String,
-    require: true,
+    required: true,
   },
   password: {
     type: String,
-    require: true,
+    required: true,
+  },
+  status: {
+    type: String,
+    enum: ['PENDING', 'APPROVED', 'REJECTED'],
+    default: 'PENDING'
   },
   setOfAssignmentsAssigned: [
     {
@@ -34,5 +28,9 @@ const User = new mongoose.Schema({
       ref: "AssignmentCreated",
     },
   ],
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
 });
 module.exports = mongoose.model("User", User);

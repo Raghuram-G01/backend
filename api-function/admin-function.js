@@ -2,71 +2,87 @@ const admin = require("../models/admin");
 const user = require("../models/user");
 const AssignmentCreated = require("../models/assignment-created");
 const AssignmentCompleted = require("../models/assignment-completed");
-const Request = require("../models/request");
 
-//worked
-exports.getAllRequests = async (req, res) => {
+exports.getPendingUsers = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { adminId } = req.params;
     
-    // Get user registration requests
-    const adminDetails = await admin.findById(id).populate("listOfRequest");
-    
-    // Get user requests (new request system)
-    const userRequests = await Request.find({ adminId: id, status: 'pending' })
-      .populate('userId', 'firstName email collegeName')
-      .sort({ createdAt: -1 });
+    const adminData = await admin.findById(adminId);
+    if (!adminData) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin not found",
+      });
+    }
+
+    const pendingUsers = await user.find({ 
+      collegeName: adminData.collegeName,
+      status: 'PENDING'
+    }).sort({ createdAt: -1 });
     
     return res.status(200).json({
       success: true,
-      data: {
-        registrationRequests: adminDetails.listOfRequest,
-        userRequests: userRequests
-      }
+      data: pendingUsers
     });
   } catch (e) {
-    return res.status(404).json({
+    return res.status(500).json({
       success: false,
-      error: e,
+      error: e.message,
     });
   }
 };
 
-//worked
-exports.acceptOrDecline = async (req, res) => {
+exports.approveUser = async (req, res) => {
   try {
-    const { adminId, userId, select } = req.body;
-    if (select === 1) {
-      await user.findByIdAndUpdate(userId, { active: true }, { new: true });
+    const { userId, action, adminId } = req.body;
+    
+    const adminData = await admin.findById(adminId);
+    if (!adminData) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin not found",
+      });
     }
+
+    const userData = await user.findById(userId);
+    if (!userData) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (userData.collegeName !== adminData.collegeName) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized to approve this user",
+      });
+    }
+
+    const newStatus = action === 'approve' ? 'APPROVED' : 'REJECTED';
+    await user.findByIdAndUpdate(userId, { status: newStatus });
+
     await admin.findByIdAndUpdate(
       adminId,
-      {
-        $pull: { listOfRequest: userId },
-      },
-      { new: true }
+      { $pull: { listOfRequest: userId } }
     );
+    
     return res.status(200).json({
       success: true,
-      message: "Process is done successfully",
+      message: `User ${newStatus.toLowerCase()} successfully`,
     });
   } catch (e) {
-    return res.status(404).json({
+    return res.status(500).json({
       success: false,
-      error: e,
+      error: e.message,
     });
   }
 };
 
-//worked
 exports.createAssignment = async (req, res) => {
   try {
     const { assignmentName, deadline, adminId } = req.body;
-    const now = new Date();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // convert incoming deadline
+    
     const deadlineDate = new Date(deadline);
     const todayDate = new Date();
     todayDate.setHours(0, 0, 0, 0);
@@ -78,10 +94,12 @@ exports.createAssignment = async (req, res) => {
         message: "Deadline cannot be a past date",
       });
     }
+
     const createAssignment = await AssignmentCreated.create({
       assignmentName,
       deadline,
     });
+
     const adminDetails = await admin.findById(adminId);
     if (!adminDetails) {
       return res.status(404).json({
@@ -97,40 +115,18 @@ exports.createAssignment = async (req, res) => {
     );
     
     await user.updateMany(
-      { collegeName: adminDetails.collegeName, active: true },
+      { collegeName: adminDetails.collegeName, status: 'APPROVED' },
       { $push: { setOfAssignmentsAssigned: createAssignment._id } }
     );
+
     return res.status(200).json({
       success: true,
-      message: "Assignment is created successfully",
+      message: "Assignment created successfully",
     });
   } catch (e) {
     return res.status(500).json({
       success: false,
       error: e.message,
-    });
-  }
-};
-
-//worked
-exports.deactivateUser = async (req, res) => {
-  try {
-    const { userId, decision } = req.body;
-    const deactivateUser = await user.findByIdAndUpdate(
-      userId,
-      {
-        active: decision,
-      },
-      { new: true }
-    );
-    return res.status(200).json({
-      success: true,
-      message: "User is deactivated",
-    });
-  } catch (e) {
-    return res.status(404).json({
-      success: false,
-      error: e,
     });
   }
 };
@@ -167,67 +163,6 @@ exports.fetchResult = async (req, res) => {
   }
 };
 
-// Get admin's assignments
-exports.getAdminAssignments = async (req, res) => {
-  try {
-    const { adminId } = req.params;
-    
-    const adminData = await admin.findById(adminId).populate('listOfAssignments');
-    
-    if (!adminData) {
-      return res.status(404).json({
-        success: false,
-        message: "Admin not found",
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: adminData.listOfAssignments,
-    });
-  } catch (e) {
-    return res.status(500).json({
-      success: false,
-      error: e.message,
-    });
-  }
-};
-
-// Handle user requests (approve/reject)
-exports.handleUserRequest = async (req, res) => {
-  try {
-    const { requestId, status, adminId } = req.body;
-    
-    const request = await Request.findById(requestId);
-    if (!request) {
-      return res.status(404).json({
-        success: false,
-        message: "Request not found"
-      });
-    }
-    
-    // Update request status
-    request.status = status;
-    await request.save();
-    
-    // If approved and it's an account activation request, activate the user
-    if (status === 'approved' && request.requestType === 'Account Activation') {
-      await user.findByIdAndUpdate(request.userId, { active: true });
-    }
-    
-    return res.status(200).json({
-      success: true,
-      message: `Request ${status} successfully`
-    });
-  } catch (e) {
-    return res.status(500).json({
-      success: false,
-      error: e.message
-    });
-  }
-};
-
-// Grade assignment submission
 exports.gradeSubmission = async (req, res) => {
   try {
     const { submissionId, marks, feedback } = req.body;
@@ -254,6 +189,31 @@ exports.gradeSubmission = async (req, res) => {
     return res.status(500).json({
       success: false,
       error: e.message
+    });
+  }
+};
+
+exports.getAdminAssignments = async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    
+    const adminData = await admin.findById(adminId).populate('listOfAssignments');
+    
+    if (!adminData) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: adminData.listOfAssignments,
+    });
+  } catch (e) {
+    return res.status(500).json({
+      success: false,
+      error: e.message,
     });
   }
 };

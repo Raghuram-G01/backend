@@ -3,8 +3,7 @@ const cors = require("cors");
 const database = require("./db-connect/db");
 const BasicRoutes = require("./routes/basic-routes");
 const AdminRoutes = require("./routes/admin-routes");
-//let port = 21000;
-let port = 8080;
+let port = 21000;
 const app = express();
 database.connect(); //
 app.use(

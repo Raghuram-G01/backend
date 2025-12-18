@@ -6,6 +6,7 @@ const {
   adminLogin,
   fetchAssignments,
   submitTest,
+  getUserSubmissions,
 } = require("../api-function/user-function");
 const { authenticateToken, authorizeRole } = require("../middleware/auth");
 
@@ -17,5 +18,6 @@ router.post("/userLogin", userLogin);
 router.post("/adminLogin", adminLogin);
 router.post("/allAssignments", authenticateToken, authorizeRole(['user']), fetchAssignments);
 router.post("/submitTest", authenticateToken, authorizeRole(['user']), submitTest);
+router.post("/submissions", authenticateToken, authorizeRole(['user']), getUserSubmissions);
 
 module.exports = router;

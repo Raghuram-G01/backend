@@ -9,18 +9,17 @@ const User = new mongoose.Schema({
     required: true,
     unique: true,
   },
-  collegeName: {
-    type: String,
-    required: true,
-  },
   password: {
     type: String,
     required: true,
   },
-  status: {
+  collegeName: {
     type: String,
-    enum: ['PENDING', 'APPROVED', 'REJECTED'],
-    default: 'PENDING'
+    required: true,
+  },
+  isApproved: {
+    type: Boolean,
+    default: false
   },
   setOfAssignmentsAssigned: [
     {

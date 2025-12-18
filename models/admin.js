@@ -2,32 +2,36 @@ const mongoose = require("mongoose");
 const Admin = new mongoose.Schema({
   firstName: {
     type: String,
-    require: true,
+    required: true,
   },
   secondName: {
     type: String,
-    require: true,
   },
   email: {
     type: String,
-    require: true,
+    required: true,
   },
   mobileNumber: {
     type: String,
-    require: true,
   },
   collegeName: {
     type: String,
-    require: true,
+    required: true,
   },
   password: {
     type: String,
-    require: true,
+    required: true,
   },
   listOfRequest: [
     {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+    },
+  ],
+  listOfAssignments: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AssignmentCreated",
     },
   ],
 });

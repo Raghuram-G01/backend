@@ -17,7 +17,7 @@ exports.getPendingUsers = async (req, res) => {
 
     const pendingUsers = await user.find({ 
       collegeName: adminData.collegeName,
-      status: 'PENDING'
+      isApproved: false
     }).sort({ createdAt: -1 });
     
     return res.status(200).json({
@@ -55,12 +55,15 @@ exports.approveUser = async (req, res) => {
     if (userData.collegeName !== adminData.collegeName) {
       return res.status(403).json({
         success: false,
-        message: "Unauthorized to approve this user",
+        message: "Unauthorized to manage this user",
       });
     }
 
-    const newStatus = action === 'approve' ? 'APPROVED' : 'REJECTED';
-    await user.findByIdAndUpdate(userId, { status: newStatus });
+    if (action === 'accept') {
+      await user.findByIdAndUpdate(userId, { isApproved: true });
+    } else {
+      await user.findByIdAndDelete(userId);
+    }
 
     await admin.findByIdAndUpdate(
       adminId,
@@ -69,7 +72,7 @@ exports.approveUser = async (req, res) => {
     
     return res.status(200).json({
       success: true,
-      message: `User ${newStatus.toLowerCase()} successfully`,
+      message: action === 'accept' ? "User approved successfully" : "User request declined",
     });
   } catch (e) {
     return res.status(500).json({
@@ -115,7 +118,7 @@ exports.createAssignment = async (req, res) => {
     );
     
     await user.updateMany(
-      { collegeName: adminDetails.collegeName, status: 'APPROVED' },
+      { collegeName: adminDetails.collegeName, isApproved: true },
       { $push: { setOfAssignmentsAssigned: createAssignment._id } }
     );
 
@@ -209,6 +212,80 @@ exports.getAdminAssignments = async (req, res) => {
     return res.status(200).json({
       success: true,
       data: adminData.listOfAssignments,
+    });
+  } catch (e) {
+    return res.status(500).json({
+      success: false,
+      error: e.message,
+    });
+  }
+};
+
+exports.getAdminStats = async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    
+    const adminData = await admin.findById(adminId);
+    if (!adminData) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin not found",
+      });
+    }
+
+    const totalStudents = await user.countDocuments({ 
+      collegeName: adminData.collegeName,
+      isApproved: true 
+    });
+    
+    const pendingApprovals = await user.countDocuments({ 
+      collegeName: adminData.collegeName,
+      isApproved: false 
+    });
+    
+    const totalAssignments = await AssignmentCreated.countDocuments({ 
+      _id: { $in: adminData.listOfAssignments } 
+    });
+    
+    const totalSubmissions = await AssignmentCompleted.countDocuments();
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalStudents,
+        pendingApprovals,
+        totalAssignments,
+        totalSubmissions
+      }
+    });
+  } catch (e) {
+    return res.status(500).json({
+      success: false,
+      error: e.message,
+    });
+  }
+};
+
+exports.getCollegeUsers = async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    
+    const adminData = await admin.findById(adminId);
+    if (!adminData) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin not found",
+      });
+    }
+
+    const users = await user.find({ 
+      collegeName: adminData.collegeName,
+      isApproved: true 
+    }).select('firstName email createdAt').sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      data: users
     });
   } catch (e) {
     return res.status(500).json({
